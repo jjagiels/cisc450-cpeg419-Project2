@@ -16,7 +16,7 @@ struct clientData {
     /* Values from the client */
     int count;          /* Number of data characters in the packet (0-80) */
     int seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
-    char data[81];       /* Characters from the document sent from the client */
+    const char data[81];       /* Characters from the document sent from the client */
 }dataSend;
 
 struct response {
@@ -110,9 +110,38 @@ int main(void) {
 
    /* user interface */
 
+
+   FILE *fp;
+   char str[81];
+   fp = fopen("test1.txt", "r");
+
+   /* opening file for reading */
+   fp = fopen("test1.txt", "r");
+   if (fp == NULL) {
+	   perror("Error opening file");
+	   return(-1);
+   }
+
+   while (!feof(fp)) {
+	   clientData packet;
+	   if (fgets(str, 81, fp) != NULL) {
+		   /* removing null character */
+		   for (i = 0; str[i] != '\0'; i++) {
+			   packet.data[i] = str[i];
+		   }
+	   }
+   }
+   
+   fclose(fp);
+
+
+
+
+/*
    printf("Please input a sentence:\n");
    scanf("%s", sentence);
    msg_len = strlen(sentence) + 1;
+*/
 
    /* send message */
   
