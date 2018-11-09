@@ -54,8 +54,12 @@ int SimulateACKLoss(float ackLoss){
 int main(int argc, char** argv) {
     srand(time(0));
     
+    /* Floating values for the packet loss and ack loss chances */
     float packLoss;
     float ackLoss;
+    
+    /* Expected Sequence number for next data packet */
+    int expectSeq = 0;
     
     if(argc != 3){
         printf("Usage is:\nudpserver <Packet Loss Rate> <ACK Loss Rate>\n");
@@ -75,8 +79,6 @@ int main(int argc, char** argv) {
     stores client address */
     unsigned int client_addr_len;  /* Length of client address structure */
     
-    char sentence[STRING_SIZE];  /* receive message */
-    char modifiedSentence[STRING_SIZE]; /* send message */
     unsigned int msg_len;  /* length of message */
     int bytes_sent, bytes_recd; /* number of bytes sent or received */
     unsigned int i;  /* temporary loop variable */
@@ -100,36 +102,61 @@ int main(int argc, char** argv) {
     
     /* bind the socket to the local server port */
     
-    if (bind(sock_server, (struct sockaddr *) &server_addr,
-        sizeof (server_addr)) < 0) {
+    if (bind(sock_server, (struct sockaddr *) &server_addr, sizeof (server_addr)) < 0) {
         perror("Server: can't bind to local address\n");
-    close(sock_server);
-    exit(1);
-        }
-        
-        /* wait for incoming messages in an indefinite loop */
-        
-        printf("Waiting for incoming messages on port %hu\n\n", 
-               server_port);
-        
-        client_addr_len = sizeof (client_addr);
+        close(sock_server);
+        exit(1);
+    }
+    
+    
+    /* wait for incoming messages in an indefinite loop */
+    
+    printf("Waiting for incoming messages on port %hu\n\n", server_port);
+    
+    client_addr_len = sizeof (client_addr);
+    
+    /* Open/Create the file for output*/
+    FILE *out;
+    out = fopen("./output.txt", "w");
         
         while(1) {
             
-            bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0,
-                                  (struct sockaddr *) &client_addr, &client_addr_len);
-            printf("Received Sentence is: %s\n     with length %d\n\n",
-                   sentence, bytes_recd);
+            bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0, (struct sockaddr *) &client_addr, &client_addr_len);
+            
+            /* Check if the packet is "lost." If so, then restart the loop and do nothing else. If not, then convert the ints and performs other operations depending on the status of count and seqNum. */
+            if(!SimulateLoss(packLoss)){
+                printf("Packet %i lost",dataRecv.seqNum);
+                continue; //Restart the loop (go back to waiting for packet) if the packet is "lost"
+            }
+            
+            /* Convert the ints in the recieved data from network to host long. */
+            dataRecv.count = ntohl(dataRecv.count);
+            dataRecv.seqNum = ntohl(dataRecv.seqNum);
+            const char* dataBuffer = dataRecv.data;
+            
+            /* Check the recieved sequence number against the expected sequnce number */
+            if(dataRecv.seqNum != expectSeq){
+                printf("Duplicate Packet %i recieved with %i data bytes", dataRecv.seqNum, dataRecv.count);
+                continue; //If the sequence number is not the expected sequence number, restart the loop and wait for a new packet
+            }else{
+                printf("Packet %i recieved with %i data bytes", dataRecv.seqNum, dataRecv.count);
+                expectSeq = 1 - expectSeq; //If the sequence number IS the expected sequence number, flip between 0 and 1
+            }
+            
+            /* If the packet is not "lost," or the packet's data field is empty, write the data from the packet to the output buffer string. */
+            
+            if(dataRecv.count != 0){
+                fputs(dataRecv.data, out);
+            }
             
             /* prepare the message to send */
             
             msg_len = bytes_recd;
-            for (i=0; i<msg_len; i++)
-                modifiedSentence[i] = toupper (sentence[i]);
             
             /* send message */
             
-            bytes_sent = sendto(sock_server, modifiedSentence, msg_len, 0,
-                                (struct sockaddr*) &client_addr, client_addr_len);
+            bytes_sent = sendto(sock_server, &ack, msg_len, 0, (struct sockaddr*) &client_addr, client_addr_len);
         }
+    /* Close the output file */
+    fclose(out);
 }

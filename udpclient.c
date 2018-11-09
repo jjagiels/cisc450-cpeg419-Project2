@@ -16,7 +16,7 @@ struct clientData {
     /* Values from the client */
     int count;          /* Number of data characters in the packet (0-80) */
     int seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
-    const char data[81];       /* Characters from the document sent from the client */
+    char data[81];       /* Characters from the document sent from the client */
 }dataSend;
 
 struct response {
@@ -123,11 +123,10 @@ int main(void) {
    }
 
    while (!feof(fp)) {
-	   clientData packet;
 	   if (fgets(str, 81, fp) != NULL) {
 		   /* removing null character */
-		   for (i = 0; str[i] != '\0'; i++) {
-			   packet.data[i] = str[i];
+		   for (int i = 0; str[i] != '\0'; i++) {
+			   dataSend.data[i] = str[i];
 		   }
 	   }
    }
