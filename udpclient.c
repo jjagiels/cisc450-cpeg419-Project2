@@ -12,6 +12,18 @@
 
 #define STRING_SIZE 1024
 
+struct clientData {
+    /* Values from the client */
+    int count;          /* Number of data characters in the packet (0-80) */
+    int seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
+    char data[81];       /* Characters from the document sent from the client */
+}dataSend;
+
+struct response {
+    /* Response from the server */
+    int ACK;            /* ACK to return for the data packet (0 or 1) */
+}ack;
+
 int main(void) {
 
    int sock_client;  /* Socket used by client */ 
