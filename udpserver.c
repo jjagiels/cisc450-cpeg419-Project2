@@ -61,6 +61,16 @@ int main(int argc, char** argv) {
     /* Expected Sequence number for next data packet */
     int expectSeq = 0;
     
+    /* Values for tracking statistics */
+    int totalGoodPackets = 0;
+    int totalBytesReceived = 0;
+    int totalDuplicatePakcets = 0;
+    int totalPacketsLost = 0;
+    int allPacketsReceived = 0;
+    int totalGoodACKs = 0;
+    int totalLostACKs = 0;
+    int allACKs = 0;
+    
     if(argc != 3){
         printf("Usage is:\nudpserver <Packet Loss Rate> <ACK Loss Rate>\n");
         exit(1);
@@ -122,10 +132,12 @@ int main(int argc, char** argv) {
         while(1) {
             
             bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0, (struct sockaddr *) &client_addr, &client_addr_len);
+            allPacketsReceived++;
             
             /* Check if the packet is "lost." If so, then restart the loop and do nothing else. If not, then convert the ints and performs other operations depending on the status of count and seqNum. */
             if(!SimulateLoss(packLoss)){
                 printf("Packet %i lost",dataRecv.seqNum);
+                totalPacketsLost++;
                 continue; //Restart the loop (go back to waiting for packet) if the packet is "lost"
             }
             
@@ -140,7 +152,6 @@ int main(int argc, char** argv) {
                 continue; //If the sequence number is not the expected sequence number, restart the loop and wait for a new packet
             }else{
                 printf("Packet %i recieved with %i data bytes", dataRecv.seqNum, dataRecv.count);
-                expectSeq = 1 - expectSeq; //If the sequence number IS the expected sequence number, flip between 0 and 1
             }
             
             /* If the packet is not "lost," or the packet's data field is empty, write the data from the packet to the output buffer string. */
@@ -152,6 +163,8 @@ int main(int argc, char** argv) {
             /* prepare the message to send */
             
             msg_len = bytes_recd;
+            ack.ACK = expectSeq;
+            expectSeq = 1 - expectSeq; //Flip the expected sequencer number between 0 and 1
             
             /* send message */
             
