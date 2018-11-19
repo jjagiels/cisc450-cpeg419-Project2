@@ -190,6 +190,7 @@ int main(int argc, char** argv) {
 
             if(dataRecv.count != 0){
                 fputs(dataRecv.data, out);
+		totalBytesReceived+=totalBytesReceived;
             }else{
 		break; //If the count field is 0, this is the EOF packet, and the server must quit, close the file, and print telemetry information
 	    }
