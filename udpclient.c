@@ -24,6 +24,11 @@ struct response {
     /* Response from the server */
     short ACK;            /* ACK to return for the data packet (0 or 1) */
 }ack;
+
+void ClearData(char *data){ //Pass by reference so the char array is modified directly
+	memset(data, ' ', 80*sizeof(char));
+}
+
 int sock_client;  /* Socket used by client */ 
 
 struct sockaddr_in client_addr;  /* Internet address structure that
@@ -46,6 +51,7 @@ struct timeval tv; /* Struct used to set the timeout value */
 
 int main(int argc, char* argv[]) {
    int timeoutExp;
+   dataSend.seqNum = 0; //Initialize the sequence number to 0
 
    if(argc == 2){
    	timeoutExp = atof(argv[1]);
@@ -144,12 +150,23 @@ int main(int argc, char* argv[]) {
    }
 
    while (!feof(fp)) {
+	   ClearData(dataSend.data); //Clear the data field of the struct
+	   dataSend.count = 0;
 	   if (fgets(str, 81, fp) != NULL) {
 		   /* removing null character */
 		   for (int i = 0; str[i] != '\0'; i++) {
 			   dataSend.data[i] = str[i];
+			   dataSend.count++;
+			   if(str[i] == '\n'){
+			   	break;
+			   }
 		   }
 	   }
+	   msg_len = sizeof(dataSend);
+	   dataSend.count = htons(dataSend.count); //Convert the count variable to newtwork form
+	   dataSend.seqNum = htons(dataSend.seqNum); //Convert the sequence number to network form
+	   bytes_sent = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr));
+
    }
    
    fclose(fp);
@@ -165,9 +182,7 @@ int main(int argc, char* argv[]) {
 
    /* send message */
   
-   bytes_sent = sendto(sock_client, sentence, msg_len, 0,
-            (struct sockaddr *) &server_addr, sizeof (server_addr));
-
+  
    /* get response from server */
   
    printf("Waiting for response from server...\n");
