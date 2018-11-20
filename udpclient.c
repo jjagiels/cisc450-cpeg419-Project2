@@ -9,40 +9,59 @@
 #include <sys/socket.h>     /* for socket, sendto, and recvfrom */
 #include <netinet/in.h>     /* for sockaddr_in */
 #include <unistd.h>         /* for close */
+#include <math.h>	    /* for exponents, specifically pow() */
 
 #define STRING_SIZE 1024
 
 struct clientData {
     /* Values from the client */
-    int count;          /* Number of data characters in the packet (0-80) */
-    int seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
-    char data[81];       /* Characters from the document sent from the client */
+    short count;          /* Number of data characters in the packet (0-80) */
+    short seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
+    char data[80];       /* Characters from the document sent from the client */
 }dataSend;
 
 struct response {
     /* Response from the server */
-    int ACK;            /* ACK to return for the data packet (0 or 1) */
+    short ACK;            /* ACK to return for the data packet (0 or 1) */
 }ack;
+int sock_client;  /* Socket used by client */ 
 
-int main(void) {
-
-   int sock_client;  /* Socket used by client */ 
-
-   struct sockaddr_in client_addr;  /* Internet address structure that
+struct sockaddr_in client_addr;  /* Internet address structure that
                                         stores client address */
-   unsigned short client_port;  /* Port number used by client (local port) */
+unsigned short client_port;  /* Port number used by client (local port) */
 
-   struct sockaddr_in server_addr;  /* Internet address structure that
+struct sockaddr_in server_addr;  /* Internet address structure that
                                         stores server address */
-   struct hostent * server_hp;      /* Structure to store server's IP
+struct hostent * server_hp;      /* Structure to store server's IP
                                         address */
-   char server_hostname[STRING_SIZE]; /* Server's hostname */
-   unsigned short server_port;  /* Port number used by server (remote port) */
+char server_hostname[STRING_SIZE]; /* Server's hostname */
+unsigned short server_port;  /* Port number used by server (remote port) */
 
-   char sentence[STRING_SIZE];  /* send message */
-   char modifiedSentence[STRING_SIZE]; /* receive message */
-   unsigned int msg_len;  /* length of message */
-   int bytes_sent, bytes_recd; /* number of bytes sent or received */
+char sentence[STRING_SIZE];  /* send message */
+char modifiedSentence[STRING_SIZE]; /* receive message */
+unsigned int msg_len;  /* length of message */
+int bytes_sent, bytes_recd; /* number of bytes sent or received */
+
+struct timeval tv; /* Struct used to set the timeout value */
+
+int main(int argc, char* argv[]) {
+   int timeoutExp;
+
+   if(argc == 2){
+   	timeoutExp = atof(argv[1]);
+	if(timeoutExp > 10){
+		printf("Timeout too large, select a number between 0 and 10, inclusive");
+		exit(0);
+	}
+   }else{
+	printf("Usage:\n./udpclient <timeout exponent>\n");
+	exit(0);
+   }
+
+   tv.tv_usec = pow(10.0,timeoutExp); //Set the timeout value in microseconds
+   tv.tv_sec = tv.tv_usec * 1/(double)pow(10.0,6.0); //Set the timeout value in seconds
+
+
   
    /* open a socket */
 
@@ -50,6 +69,8 @@ int main(void) {
       perror("Client: can't open datagram socket\n");
       exit(1);
    }
+
+   setsockopt(sock_client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)); //Sets the timeout value for the socket defined
 
    /* Note: there is no need to initialize local client address information
             unless you want to specify a specific local port.
