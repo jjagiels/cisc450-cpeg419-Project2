@@ -13,22 +13,6 @@
 
 #define STRING_SIZE 1024
 
-struct clientData {
-    /* Values from the client */
-    short count;          /* Number of data characters in the packet (0-80) */
-    short seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
-    char data[80];       /* Characters from the document sent from the client */
-}dataSend;
-
-struct response {
-    /* Response from the server */
-    short ACK;            /* ACK to return for the data packet (0 or 1) */
-}ack;
-
-void ClearData(char *data){ //Pass by reference so the char array is modified directly
-	memset(data, ' ', 80*sizeof(char));
-}
-
 int sock_client;  /* Socket used by client */ 
 
 struct sockaddr_in client_addr;  /* Internet address structure that
@@ -46,12 +30,57 @@ char sentence[STRING_SIZE];  /* send message */
 char modifiedSentence[STRING_SIZE]; /* receive message */
 unsigned int msg_len;  /* length of message */
 int bytes_sent, bytes_recd; /* number of bytes sent or received */
+int ack_len; /* length of each ACK */
 
 struct timeval tv; /* Struct used to set the timeout value */
+int expectedACK; /* Counter used to keep track of the ACK expected from the server */
+
+struct clientData {
+    /* Values from the client */
+    short count;          /* Number of data characters in the packet (0-80) */
+    short seqNum;		/* 0 or 1, in accordance with the stop and wait protocol*/
+    char data[80];       /* Characters from the document sent from the client */
+}dataSend;
+
+struct response {
+    /* Response from the server */
+    short ACK;            /* ACK to return for the data packet (0 or 1) */
+}ack;
+
+void ClearData(char *data){ //Pass by reference so the char array is modified directly
+	memset(data, ' ', 80*sizeof(char)); //Clear the data field to ensure that no data is copied accidentally
+}
+
+int SendAndReceive(){ //Send data to the server, wait for an ACK (until timeout reached), and handle any retransmissions. This function will only return once a suitable ACK has been returned
+	int bytes_sent_temp;
+	int bytes_recd_temp;
+	//TODO:Increment the original transmission counter
+	do{ //Loop The transmission and ACK waiting until bytes_recd is greater than 0 (Meaning that a valid ACK was received) and the received ACK is the expected ACK (Meaning that the server received an in-order packet)
+	 	bytes_sent_temp = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the data packet
+		bytes_recd_temp = recvfrom(sock_client, &ack, ack_len, 0, (struct sockaddr *) 0, (int *) 0); //Wait for an ACK
+		if(bytes_recd == -1){ //The recvfrom function returned an error (most likely from a timeout)
+			//TODO: Increment the timeout counter and the retransmit counter
+
+		}
+		else{ //The recvfrom function did not return an error (received an ACK)
+			ack.ACK = ntohs(ack.ACK); //Convert the received ACK from network to host form
+			if(ack.ACK != expectedACK){ //If the ACK is not the expected ACK...
+			//TODO: Increment the duplicate ACK counter and the retransmit counter
+			}else{
+				//TODO: Increment the successful ACKs received counter
+				return bytes_recd_temp;
+			}
+		}
+	}while((bytes_recd_temp < 0) || (ack.ACK != expectedACK)); //if bytes_recd is -1 or the ACK is not the expected ACK, loop again (retransmit)
+	return -1; //If this is returned, something went terribly wrong
+}
+
 
 int main(int argc, char* argv[]) {
    int timeoutExp;
+   ack_len = sizeof(ack); //set the ack length to the size of the ack struct
    dataSend.seqNum = 0; //Initialize the sequence number to 0
+   expectedACK = 0; //Initialize the expected ACK to 0
 
    if(argc == 2){
    	timeoutExp = atof(argv[1]);
@@ -151,7 +180,7 @@ int main(int argc, char* argv[]) {
 
    while (!feof(fp)) {
 	   ClearData(dataSend.data); //Clear the data field of the struct
-	   dataSend.count = 0;
+	   dataSend.count = 0; //Set the count to 0
 	   if (fgets(str, 81, fp) != NULL) {
 		   /* removing null character */
 		   for (int i = 0; str[i] != '\0'; i++) {
@@ -163,35 +192,18 @@ int main(int argc, char* argv[]) {
 		   }
 	   }
 	   msg_len = sizeof(dataSend);
+	   dataSend.seqNum = expectedACK; //Set the sequence number of the data packet to be the same value as the ACK expected from the server
 	   dataSend.count = htons(dataSend.count); //Convert the count variable to newtwork form
 	   dataSend.seqNum = htons(dataSend.seqNum); //Convert the sequence number to network form
-	   bytes_sent = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr));
-
+	   bytes_recd = SendAndReceive(); //This function always waits for a valid ACK
+	   expectedACK = 1 - expectedACK; //Once SendAndReceive has returned, toggle the expected ACK
    }
    
    fclose(fp);
 
 
 
-
-/*
-   printf("Please input a sentence:\n");
-   scanf("%s", sentence);
-   msg_len = strlen(sentence) + 1;
-*/
-
-   /* send message */
-  
-  
-   /* get response from server */
-  
-   printf("Waiting for response from server...\n");
-   bytes_recd = recvfrom(sock_client, modifiedSentence, STRING_SIZE, 0,
-                (struct sockaddr *) 0, (int *) 0);
-   printf("\nThe response from server is:\n");
-   printf("%s\n\n", modifiedSentence);
-
-   /* close the socket */
+/* close the socket */
 
    close (sock_client);
 }
