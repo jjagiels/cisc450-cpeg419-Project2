@@ -31,7 +31,16 @@ int bytes_sent, bytes_recd; /* number of bytes sent or received */
 int ack_len; /* length of each ACK */
 
 struct timeval tv; /* Struct used to set the timeout value */
-int expectedACK; /* Counter used to keep track of the ACK expected from the server */
+int expectedACK = 0; /* Counter used to keep track of the ACK expected from the server */
+int i; /* Temporary Loop Variable */
+
+/* Variables to track telemetry */
+int initialPackets = 0; //Number of data packets transmitted (initial transmission only)
+int totalBytesTransmitted = 0; //Total number of data bytes transmitted (sum of the count fields of all transmitted packets when transmitted for the first time)
+int retransmittedPackets = 0; //Total number of retransmissions
+int totalPackets = 0; //Total number of data packets transmitted (initial transmissions plus retransmissions)
+int ACKsReceived = 0; //Number of ACKs received
+int numTimeouts = 0; //How many times the timeout expired
 
 struct clientData {
     /* Values from the client */
@@ -50,22 +59,38 @@ void ClearData(char *data){ //Pass by reference so the char array is modified di
 }
 
 int SendAndReceive(){ //Send data to the server, wait for an ACK (until timeout reached), and handle any retransmissions. This function will only return once a suitable ACK has been returned
-    int bytes_sent_temp;
-    int bytes_recd_temp;
-    //TODO:Increment the original transmission counter
+    initialPackets++; //Increment the original transmission counter
+    totalBytesTransmitted+=dataSend.count; //Add the count of bytes in this packet to the running total
+    msg_len = sizeof(dataSend);
+    dataSend.seqNum = expectedACK; //Set the sequence number of the data packet to be the same value as the ACK expected from the server
+    printf("Packet %i transmitted with %i data bytes\n", dataSend.seqNum, dataSend.count);
+    dataSend.count = htons(dataSend.count); //Convert the count variable to newtwork form
+    dataSend.seqNum = htons(dataSend.seqNum); //Convert the sequence number to network form
+    int bytes_sent_temp; //Initialize a temp value for bytes_sent
+    int bytes_recd_temp; //Initialize a temp value for bytes_recd
+
     do{ //Loop The transmission and ACK waiting until bytes_recd is greater than 0 (Meaning that a valid ACK was received) and the received ACK is the expected ACK (Meaning that the server received an in-order packet)
         bytes_sent_temp = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the data packet
         bytes_recd_temp = recvfrom(sock_client, &ack, ack_len, 0, (struct sockaddr *) 0, (int *) 0); //Wait for an ACK
         if(bytes_recd == -1){ //The recvfrom function returned an error (most likely from a timeout)
-            //TODO: Increment the timeout counter and the retransmit counter
+            //Increment the timeout counter and the retransmit counter
+	    numTimeouts++;
+	    retransmittedPackets++;
+	    printf("Packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to host form, so temporarilly convert back for printing purposes
             
         }
         else{ //The recvfrom function did not return an error (received an ACK)
             ack.ACK = ntohs(ack.ACK); //Convert the received ACK from network to host form
             if(ack.ACK != expectedACK){ //If the ACK is not the expected ACK...
-                //TODO: Increment the duplicate ACK counter and the retransmit counter
+                //Increment the ACK counter and the retransmit counter
+		ACKsReceived++;
+		retransmittedPackets++;
+		printf("ACK %i received\n",ack.ACK);
+		printf("This is a duplicate ACK, so packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to network form, so temporarilly convert back for printing purposes
             }else{
-                //TODO: Increment the successful ACKs received counter
+                //Increment the successful ACKs received counter
+		ACKsReceived++;
+		printf("ACK %i received\n",ack.ACK);
                 return bytes_recd_temp;
             }
         }
@@ -78,7 +103,7 @@ int main(int argc, char* argv[]) {
     int timeoutExp;
     ack_len = sizeof(ack); //set the ack length to the size of the ack struct
     dataSend.seqNum = 0; //Initialize the sequence number to 0
-    expectedACK = 0; //Initialize the expected ACK to 0
+
     
     if(argc == 2){
         timeoutExp = atof(argv[1]);
@@ -91,9 +116,9 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
     
-    tv.tv_usec = pow(10.0,timeoutExp); //Set the timeout value in microseconds
-    tv.tv_sec = tv.tv_usec * 1/(double)pow(10.0,6.0); //Set the timeout value in seconds
-    
+    int temp_usec = pow(10.0,timeoutExp); //This is the timeout value in microseconds only
+    tv.tv_sec = temp_usec * 1/(double)pow(10.0,6.0); //Set the timeout value in seconds
+    tv.tv_usec = temp_usec%1000000; //Sets the remainder of microseconds to the microsecond field.
     
     
     /* open a socket */
@@ -156,15 +181,14 @@ int main(int argc, char* argv[]) {
         /* Clear server address structure and initialize with server address */
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
-        memcpy((char *)&server_addr.sin_addr, server_hp->h_addr,
-               server_hp->h_length);
+        memcpy((char *)&server_addr.sin_addr, server_hp->h_addr, server_hp->h_length);
         server_addr.sin_port = htons(server_port);
         
         /* user interface */
         
         
         FILE *fp;
-        char str[81];
+        char str[81]; //Buffer is size 81, since fgets appends a null terminator after a newline
         
         /* opening file for reading */
         fp = fopen("test1.txt", "r");
@@ -173,30 +197,32 @@ int main(int argc, char* argv[]) {
             return(-1);
         }
         
-        while (!feof(fp)) {
+        while (fgets(str, 80, fp) != NULL) {
             ClearData(dataSend.data); //Clear the data field of the struct
             dataSend.count = 0; //Set the count to 0
-            if (fgets(str, 81, fp) != NULL) {
+
                 /* removing null character */
-                for (int i = 0; str[i] != '\0'; i++) {
+		i = 0;
+		while(str[i] != '\0'){
                     dataSend.data[i] = str[i];
                     dataSend.count++;
-                    if(str[i] == '\n'){
-                        break;
-                    }
+		    i++;
                 }
-            }
-            msg_len = sizeof(dataSend);
-            dataSend.seqNum = expectedACK; //Set the sequence number of the data packet to be the same value as the ACK expected from the server
-            dataSend.count = htons(dataSend.count); //Convert the count variable to newtwork form
-            dataSend.seqNum = htons(dataSend.seqNum); //Convert the sequence number to network form
+          
             bytes_recd = SendAndReceive(); //This function always waits for a valid ACK
             expectedACK = 1 - expectedACK; //Once SendAndReceive has returned, toggle the expected ACK
-        }
-        
-        fclose(fp);
-        
-        
+        } //Once this while loop has finished, the EOF has been reached, and the client should transmit the EOF packet (count = 0)
+       
+	dataSend.count = 0;
+	ClearData(dataSend.data);
+	dataSend.seqNum = expectedACK;
+	dataSend.count = htons(dataSend.count);
+	dataSend.seqNum = htons(dataSend.seqNum);
+	sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the EOF data packet
+
+	printf("End of File Reached, EOF Packet sent with Sequence number %i, printing statistics:\n\nNumber of data packets transmitted(initial transmission only): %i\nTotal number of data bytes transmitted: %i\nTotal number of retransmissions: %i\nTotal number of data packets transmitted: %i\nNumber of ACKs received: %i\nHow many times the timeout expired: %i\n", ntohs(dataSend.seqNum), initialPackets, totalBytesTransmitted, retransmittedPackets, totalPackets, ACKsReceived, numTimeouts);
+
+        fclose(fp); //close the output file       
         
         /* close the socket */
         

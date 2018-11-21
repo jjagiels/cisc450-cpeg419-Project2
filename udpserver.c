@@ -86,11 +86,11 @@ int SendACK(int seqNum, float ackLoss){
     
     if(SimulateACKLoss(ackLoss)){
         bytes_sent = sendto(sock_server, &ack, msg_len, 0, (struct sockaddr*) &client_addr, client_addr_len); //If SimulateACKLoss returns 1, send the packet
-        printf("ACK %i transmitted", ack.ACK);
+        printf("ACK %i transmitted\n", ntohs(ack.ACK)); //The ACK has been converted to network form, so convert back temporarily for this print out
         totalGoodACKs++;
         return bytes_sent;
     }else{
-        printf("Ack %i lost", ack.ACK);
+        printf("Ack %i lost", ntohs(ack.ACK)); //The ACK has been converted to network form, so convert back temporarily for this print out
         totalLostACKs++; //If SimulateACKLoss returns 0, do not transmit an ACK
         return 0;
     }
@@ -159,7 +159,8 @@ int main(int argc, char** argv) {
         
         bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0, (struct sockaddr *) &client_addr, &client_addr_len);
         allPacketsReceived++;
-        
+	/* Check the count field of the received packet, if it is 0, that is the EOF, so imediately quit*/
+        dataRecv.count = ntohs(dataRecv.count);       
         /* Check if the packet is "lost." If so, then restart the loop and do nothing else. If not, then convert the ints and performs other operations depending on the status of count and seqNum. */
         if(!SimulateLoss(packLoss)){
             printf("Packet %i lost\n",dataRecv.seqNum);
@@ -168,7 +169,7 @@ int main(int argc, char** argv) {
         }
         
         /* Convert the ints in the recieved data from network to host long. */
-        dataRecv.count = ntohs(dataRecv.count);
+
         dataRecv.seqNum = ntohs(dataRecv.seqNum);
         
         
@@ -185,12 +186,14 @@ int main(int argc, char** argv) {
         
         /* If the packet is not "lost," or the packet's data field is empty, write the data from the packet to the output buffer string. */
         
-        /* Store the data from the packet to the local variable */
-        const char* dataBuffer = dataRecv.data;
+
         
         if(dataRecv.count != 0){
-            fputs(dataRecv.data, out);
-            totalBytesReceived+=totalBytesReceived;
+		for(int i = 0; i < dataRecv.count; i++){
+			fputc(dataRecv.data[i],out);
+		}
+            fputc(dataRecv.data, out);
+            totalBytesReceived+=dataRecv.count;
         }else{
             break; //If the count field is 0, this is the EOF packet, and the server must quit, close the file, and print telemetry information
         }
