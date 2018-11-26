@@ -72,7 +72,7 @@ int SendAndReceive(){ //Send data to the server, wait for an ACK (until timeout 
     do{ //Loop The transmission and ACK waiting until bytes_recd is greater than 0 (Meaning that a valid ACK was received) and the received ACK is the expected ACK (Meaning that the server received an in-order packet)
         bytes_sent_temp = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the data packet
         bytes_recd_temp = recvfrom(sock_client, &ack, ack_len, 0, (struct sockaddr *) 0, (int *) 0); //Wait for an ACK
-        if(bytes_recd == -1){ //The recvfrom function returned an error (most likely from a timeout)
+        if(bytes_recd_temp == -1){ //The recvfrom function returned an error (most likely from a timeout)
             //Increment the timeout counter and the retransmit counter
 	    numTimeouts++;
 	    retransmittedPackets++;
@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
         char str[81]; //Buffer is size 81, since fgets appends a null terminator after a newline
         
         /* opening file for reading */
-        fp = fopen("test1.txt", "r");
+        fp = fopen("test2.txt", "r");
         if (fp == NULL) {
             perror("Error opening file");
             return(-1);
@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
 	dataSend.count = htons(dataSend.count);
 	dataSend.seqNum = htons(dataSend.seqNum);
 	sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the EOF data packet
-
+        totalPackets = initialPackets + retransmittedPackets;
 	printf("End of File Reached, EOF Packet sent with Sequence number %i, printing statistics:\n\nNumber of data packets transmitted(initial transmission only): %i\nTotal number of data bytes transmitted: %i\nTotal number of retransmissions: %i\nTotal number of data packets transmitted: %i\nNumber of ACKs received: %i\nHow many times the timeout expired: %i\n", ntohs(dataSend.seqNum), initialPackets, totalBytesTransmitted, retransmittedPackets, totalPackets, ACKsReceived, numTimeouts);
 
         fclose(fp); //close the output file       

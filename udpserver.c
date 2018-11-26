@@ -55,8 +55,8 @@ struct response {
     short ACK;            /* ACK to return for the data packet (0 or 1) */
 }ack;
 
-int SimulateLoss(float packLoss){
-    float testVal = (rand()%101)/100; //Generate a random number from 0-100, and divide by 100 to get a float from 0-1
+int SimulateLoss(double packLoss){
+    double testVal = (double)(rand()%101)/100; //Generate a random number from 0-100, and divide by 100 to get a float from 0-1
     if(testVal < packLoss){
         return 0; //The packet is lost
     }else{
@@ -64,8 +64,8 @@ int SimulateLoss(float packLoss){
     }
 }
 
-int SimulateACKLoss(float ackLoss){
-    float testVal = (rand()%101)/100; //Generate a random number from 0-100, and divide by 100 to get a float from 0-1
+int SimulateACKLoss(double ackLoss){
+    double testVal = (double)(rand()%101)/100; //Generate a random number from 0-100, and divide by 100 to get a float from 0-1
     if(testVal < ackLoss){
         return 0; //The ACK is lost
     }else{
@@ -90,7 +90,7 @@ int SendACK(int seqNum, float ackLoss){
         totalGoodACKs++;
         return bytes_sent;
     }else{
-        printf("Ack %i lost", ntohs(ack.ACK)); //The ACK has been converted to network form, so convert back temporarily for this print out
+        printf("Ack %i lost\n", ntohs(ack.ACK)); //The ACK has been converted to network form, so convert back temporarily for this print out
         totalLostACKs++; //If SimulateACKLoss returns 0, do not transmit an ACK
         return 0;
     }
@@ -100,8 +100,8 @@ int main(int argc, char** argv) {
     srand(time(0));
     
     /* Floating values for the packet loss and ack loss chances */
-    float packLoss;
-    float ackLoss;
+    double packLoss;
+    double ackLoss;
     
     /* Expected Sequence number for next data packet */
     int expectSeq = 0;
@@ -117,7 +117,6 @@ int main(int argc, char** argv) {
     }
     
     
-    unsigned int i;  /* temporary loop variable */
     
     /* open a socket */
     
@@ -160,10 +159,13 @@ int main(int argc, char** argv) {
         bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0, (struct sockaddr *) &client_addr, &client_addr_len);
         allPacketsReceived++;
 	/* Check the count field of the received packet, if it is 0, that is the EOF, so imediately quit*/
-        dataRecv.count = ntohs(dataRecv.count);       
+        dataRecv.count = ntohs(dataRecv.count);   
+        if(dataRecv.count == 0){
+            break;
+        }
         /* Check if the packet is "lost." If so, then restart the loop and do nothing else. If not, then convert the ints and performs other operations depending on the status of count and seqNum. */
         if(!SimulateLoss(packLoss)){
-            printf("Packet %i lost\n",dataRecv.seqNum);
+            printf("Packet %i lost\n",ntohs(dataRecv.seqNum));
             totalPacketsLost++;
             continue; //Restart the loop (go back to waiting for packet) if the packet is "lost"
         }
@@ -192,7 +194,6 @@ int main(int argc, char** argv) {
 		for(int i = 0; i < dataRecv.count; i++){
 			fputc(dataRecv.data[i],out);
 		}
-            fputc(dataRecv.data, out);
             totalBytesReceived+=dataRecv.count;
         }else{
             break; //If the count field is 0, this is the EOF packet, and the server must quit, close the file, and print telemetry information
