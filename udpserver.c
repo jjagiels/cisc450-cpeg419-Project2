@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
         
         bytes_recd = recvfrom(sock_server, &dataRecv, STRING_SIZE, 0, (struct sockaddr *) &client_addr, &client_addr_len);
         allPacketsReceived++;
-	/* Check the count field of the received packet, if it is 0, that is the EOF, so imediately quit*/
+        /* Check the count field of the received packet, if it is 0, that is the EOF, so imediately quit*/
         dataRecv.count = ntohs(dataRecv.count);   
         if(dataRecv.count == 0){
             break;
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
         }
         
         /* Convert the ints in the recieved data from network to host long. */
-
+        
         dataRecv.seqNum = ntohs(dataRecv.seqNum);
         
         
@@ -188,12 +188,12 @@ int main(int argc, char** argv) {
         
         /* If the packet is not "lost," or the packet's data field is empty, write the data from the packet to the output buffer string. */
         
-
+        
         
         if(dataRecv.count != 0){
-		for(int i = 0; i < dataRecv.count; i++){
-			fputc(dataRecv.data[i],out);
-		}
+            for(int i = 0; i < dataRecv.count; i++){
+                fputc(dataRecv.data[i],out);
+            }
             totalBytesReceived+=dataRecv.count;
         }else{
             break; //If the count field is 0, this is the EOF packet, and the server must quit, close the file, and print telemetry information

@@ -70,29 +70,29 @@ int SendAndReceive(){ //Send data to the server, wait for an ACK (until timeout 
     dataSend.seqNum = htons(dataSend.seqNum); //Convert the sequence number to network form
     int bytes_sent_temp; //Initialize a temp value for bytes_sent
     int bytes_recd_temp; //Initialize a temp value for bytes_recd
-
+    
     do{ //Loop The transmission and ACK waiting until bytes_recd is greater than 0 (Meaning that a valid ACK was received) and the received ACK is the expected ACK (Meaning that the server received an in-order packet)
         bytes_sent_temp = sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the data packet
         bytes_recd_temp = recvfrom(sock_client, &ack, ack_len, 0, (struct sockaddr *) 0, (int *) 0); //Wait for an ACK
         if(bytes_recd_temp == -1){ //The recvfrom function returned an error (most likely from a timeout)
             //Increment the timeout counter and the retransmit counter
-	    numTimeouts++;
-	    retransmittedPackets++;
-	    printf("Packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to host form, so temporarilly convert back for printing purposes
+            numTimeouts++;
+            retransmittedPackets++;
+            printf("Packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to host form, so temporarilly convert back for printing purposes
             
         }
         else{ //The recvfrom function did not return an error (received an ACK)
             ack.ACK = ntohs(ack.ACK); //Convert the received ACK from network to host form
             if(ack.ACK != expectedACK){ //If the ACK is not the expected ACK...
                 //Increment the ACK counter and the retransmit counter
-		ACKsReceived++;
-		retransmittedPackets++;
-		printf("ACK %i received\n",ack.ACK);
-		printf("This is a duplicate ACK, so packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to network form, so temporarilly convert back for printing purposes
+                ACKsReceived++;
+                retransmittedPackets++;
+                printf("ACK %i received\n",ack.ACK);
+                printf("This is a duplicate ACK, so packet %i retransmitted with %i data bytes\n",ntohs(dataSend.seqNum),ntohs(dataSend.count)); //The seqNum and count fields have been converted to network form, so temporarilly convert back for printing purposes
             }else{
                 //Increment the successful ACKs received counter
-		ACKsReceived++;
-		printf("ACK %i received\n",ack.ACK);
+                ACKsReceived++;
+                printf("ACK %i received\n",ack.ACK);
                 return bytes_recd_temp;
             }
         }
@@ -105,14 +105,14 @@ int main(int argc, char* argv[]) {
     int timeoutExp;
     ack_len = sizeof(ack); //set the ack length to the size of the ack struct
     dataSend.seqNum = 0; //Initialize the sequence number to 0
-
+    
     
     if(argc == 3){
         timeoutExp = atof(argv[1]);
-	const char* inputFile = argv[2];
+        const char* inputFile = argv[2];
         /* opening file for reading */
-
-       	fp = fopen(inputFile, "r");
+        
+        fp = fopen(inputFile, "r");
         if (fp == NULL) {
             perror("Error opening file");
             exit(0);
@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
     client_addr.sin_family = AF_INET;
     client_addr.sin_addr.s_addr = htonl(INADDR_ANY); /* This allows choice of any host interface, if more than one are present */
     client_addr.sin_port = htons(client_port);
-     
+    
     /* bind the socket to the local client port */
     
     if (bind(sock_client, (struct sockaddr *) &client_addr,
@@ -197,37 +197,37 @@ int main(int argc, char* argv[]) {
         /* user interface */
         
         
-
+        
         char str[81]; //Buffer is size 81, since fgets appends a null terminator after a newline
         
-
-       
+        
+        
         
         while (fgets(str, 80, fp) != NULL) {
             ClearData(dataSend.data); //Clear the data field of the struct
             dataSend.count = 0; //Set the count to 0
-
-                /* removing null character */
-		i = 0;
-		while(str[i] != '\0'){
-                    dataSend.data[i] = str[i];
-                    dataSend.count++;
-		    i++;
-                }
-          
+            
+            /* removing null character */
+            i = 0;
+            while(str[i] != '\0'){
+                dataSend.data[i] = str[i];
+                dataSend.count++;
+                i++;
+            }
+            
             bytes_recd = SendAndReceive(); //This function always waits for a valid ACK
             expectedACK = 1 - expectedACK; //Once SendAndReceive has returned, toggle the expected ACK
         } //Once this while loop has finished, the EOF has been reached, and the client should transmit the EOF packet (count = 0)
-       
-	dataSend.count = 0;
-	ClearData(dataSend.data);
-	dataSend.seqNum = expectedACK;
-	dataSend.count = htons(dataSend.count);
-	dataSend.seqNum = htons(dataSend.seqNum);
-	sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the EOF data packet
+        
+        dataSend.count = 0;
+        ClearData(dataSend.data);
+        dataSend.seqNum = expectedACK;
+        dataSend.count = htons(dataSend.count);
+        dataSend.seqNum = htons(dataSend.seqNum);
+        sendto(sock_client, &dataSend, msg_len, 0, (struct sockaddr *) &server_addr, sizeof (server_addr)); //Send the EOF data packet
         totalPackets = initialPackets + retransmittedPackets;
-	printf("End of File Reached, EOF Packet sent with Sequence number %i, printing statistics:\n\nNumber of data packets transmitted(initial transmission only): %i\nTotal number of data bytes transmitted: %i\nTotal number of retransmissions: %i\nTotal number of data packets transmitted: %i\nNumber of ACKs received: %i\nHow many times the timeout expired: %i\n", ntohs(dataSend.seqNum), initialPackets, totalBytesTransmitted, retransmittedPackets, totalPackets, ACKsReceived, numTimeouts);
-
+        printf("End of File Reached, EOF Packet sent with Sequence number %i, printing statistics:\n\nNumber of data packets transmitted(initial transmission only): %i\nTotal number of data bytes transmitted: %i\nTotal number of retransmissions: %i\nTotal number of data packets transmitted: %i\nNumber of ACKs received: %i\nHow many times the timeout expired: %i\n", ntohs(dataSend.seqNum), initialPackets, totalBytesTransmitted, retransmittedPackets, totalPackets, ACKsReceived, numTimeouts);
+        
         fclose(fp); //close the output file       
         
         /* close the socket */
