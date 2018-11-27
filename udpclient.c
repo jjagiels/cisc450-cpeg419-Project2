@@ -1,5 +1,6 @@
 /* udp_client.c */ 
 /* Programmed by Adarsh Sethi */
+/* Modified by Justin Jagielski and Marco Arcilla */
 /* Sept. 13, 2018 */
 
 #include <stdio.h>          /* for standard I/O functions */
@@ -42,6 +43,7 @@ int totalPackets = 0; //Total number of data packets transmitted (initial transm
 int ACKsReceived = 0; //Number of ACKs received
 int numTimeouts = 0; //How many times the timeout expired
 
+FILE *fp; //File pointer used for the input
 struct clientData {
     /* Values from the client */
     short count;          /* Number of data characters in the packet (0-80) */
@@ -105,14 +107,22 @@ int main(int argc, char* argv[]) {
     dataSend.seqNum = 0; //Initialize the sequence number to 0
 
     
-    if(argc == 2){
+    if(argc == 3){
         timeoutExp = atof(argv[1]);
+	const char* inputFile = argv[2];
+        /* opening file for reading */
+
+       	fp = fopen(inputFile, "r");
+        if (fp == NULL) {
+            perror("Error opening file");
+            exit(0);
+        }
         if(timeoutExp > 10){
             printf("Timeout too large, select a number between 0 and 10, inclusive");
             exit(0);
         }
     }else{
-        printf("Usage:\n./udpclient <timeout exponent>\n");
+        printf("Usage:\n./udpclient <timeout exponent> <input file>\n");
         exit(0);
     }
     
@@ -187,15 +197,11 @@ int main(int argc, char* argv[]) {
         /* user interface */
         
         
-        FILE *fp;
+
         char str[81]; //Buffer is size 81, since fgets appends a null terminator after a newline
         
-        /* opening file for reading */
-        fp = fopen("test2.txt", "r");
-        if (fp == NULL) {
-            perror("Error opening file");
-            return(-1);
-        }
+
+       
         
         while (fgets(str, 80, fp) != NULL) {
             ClearData(dataSend.data); //Clear the data field of the struct
