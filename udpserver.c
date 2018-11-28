@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
             bytes_sent = SendACK(1 - expectSeq, ackLoss);
             continue; //If the sequence number is not the expected sequence number (Meaning the packet was a duplicate), send an ACK of the last sequence number, restart the loop and wait for a new packet
         }else{
-            printf("Packet %i recieved with %i data bytes\n", dataRecv.seqNum, dataRecv.count);
+            printf("Packet %i received with %i data bytes\n", dataRecv.seqNum, dataRecv.count);
             totalGoodPackets++;
         }
         

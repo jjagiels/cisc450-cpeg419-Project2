@@ -8,4 +8,4 @@ udpserver: udpserver.c;
 	${CC} -g udpserver.c -o udpserver -std=gnu99
 
 clean:
-	rm udpclient udpserver
+	rm udpclient udpserver output.txt
